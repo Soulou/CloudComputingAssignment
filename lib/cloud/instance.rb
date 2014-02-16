@@ -1,30 +1,92 @@
 module Cloud
   class Instance
     $last_id = 0
+
     def initialize(conn, opts = {})
       @conn = conn
-      if opts.has_key? :type and opts[:type] == "gateway"
-        build_gateway opts
+      if opts.has_key? :instance
+        @instance = opts[:instance]
       else
         $last_id += 1
-        build_instance $last_id
+        @instance = build_instance $last_id
       end
     end
 
-    private
+    def delete
+      @instance.delete!
+    end
 
-    def build_gateway(opts)
-      instance = build_instance 0
-      puts "Wait VM to be ready to associate floating IP"
-      while instance.status == "BUILD"
-        instance.refresh
-        print "."
-        sleep 1
+    def method_missing(*args)
+      @instance.send args[0]
+    end
+
+    def self.wait_all_boot(conn, instances)
+      # We destroy the array so a copy before is required
+      instances = instances.clone
+      vm_deleted = true
+      while true
+        if vm_deleted
+          puts "\nWait for [#{instances.map(&:name).join(", ")}] boot"
+          vm_deleted = false
+        end
+
+        instances.each do |i|
+          if i.status == "ACTIVE"
+            instances.delete(i)
+            vm_deleted = true
+          else
+            i.refresh
+          end
+        end
+        if instances.length == 0
+          puts "\nAll VMs have successfuly boot"
+          break
+        else
+          print "."
+          sleep 1
+        end
       end
-      puts
+    end
 
-      opts[:quantum].list_ports.each do |p|
-        if p.device_id == instance.id and p.fixed_ips[0]["ip_address"] =~ /^192\.168.*/
+    def self.wait_all_death(conn, instances)
+      # We destroy the array so a copy before is required
+      instances = instances.clone
+      vm_deleted = true
+      while true
+        if vm_deleted
+          puts "\nWait for [#{instances.map(&:name).join(", ")}] shutdown"
+          vm_deleted = false
+        end
+
+        instances.each do |i|
+          begin
+            i.refresh
+          rescue OpenStack::Exception::ItemNotFound
+            instances.delete(i)
+            vm_deleted = true
+          end
+        end
+        if instances.length == 0
+          puts "\nAll VMs have been deleted"
+          break
+        else
+          print "."
+          sleep 1
+        end
+      end
+    end
+
+    def self.all(conn)
+      conn.list_servers.select{ |s|
+        s[:name] =~ /^#{INSTANCE_PREFIX}.*/
+      }.map{ |s|
+        self.new conn, instance: OpenStack::Compute::Server.new(conn, s[:id])
+      }
+    end
+
+    def set_floating_ip(quantum, ip)
+      quantum.list_ports.each do |p|
+        if p.device_id == @instance.id and p.fixed_ips[0]["ip_address"] =~ /^192\.168.*/
           @port = p
           break
         end
@@ -32,11 +94,10 @@ module Cloud
 
       # Not in the ruby-openstack gem
       data = JSON.generate({:floatingip => {:port_id => @port.id}})
-      opts[:quantum].connection.req("PUT", "/floatingips/#{opts[:ip].id}", :data => data)
-
-      return instance
+      quantum.connection.req("PUT", "/floatingips/#{ip.id}", :data => data)
     end
 
+    private
     def build_instance(index)
       image = get_image VM_IMAGE
       flavor = @conn.get_flavor FLAVOR_1GB

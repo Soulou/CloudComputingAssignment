@@ -14,38 +14,50 @@ module Cloud
   end
   
   class Builder
-    def initialize(nb_instances)
-      @nb_instances = nb_instances
+    def initialize
       @router = nil
       @instances = []
    
       check_openstack_env
       @quantum = setup_connection "network"
-      @network = Network.get @quantum
-      @subnetwork = SubNetwork.get @quantum, @network
+
+      @network = Network.new @quantum
+      @subnetwork = SubNetwork.new @quantum, @network
       @tenant_id = @network.tenant_id
-      @router = Router.get @quantum, @subnetwork.id
+      @router = Router.new @quantum, @subnetwork
 
       @compute = setup_connection "compute"
+    end
+
+    def build(nb_instances)
       KeyPair.import @compute
       SecRule.new @compute, "-1"
       SecRule.new @compute, "22"
       @floating_ip = FloatingIp.get @compute
-
-      @gateway_instance = Instance.new(
-        @compute, {
-          :quantum => @quantum,
-          :type => "gateway", 
-          :ip => @floating_ip
-        }
-      )
-      (1...nb_instances).each do
-        Instance.new @compute
+      @instances = []
+      (0...nb_instances).each do
+        @instances << Instance.new(@compute)
       end
+      Instance.wait_all_boot(@compute, @instances)
+      @instances[0].set_floating_ip(@quantum, @floating_ip)
       
       puts "Cluster is booting, public ip is #{@floating_ip.ip}"
     end
     
+    def purge
+      @instances = Instance.all @compute
+      if @instances == nil or @instances.length == 0
+        puts "No VM to destroy"
+      end
+      @instances.each do |i| i.delete end
+      Instance.wait_all_death(@compute, @instances)
+      @router.delete
+      @subnetwork.delete
+      @network.delete
+    end
+
+    private 
+
     def check_openstack_env
       puts "Validation of the Openstack environment variables"
       %w(OS_USERNAME OS_PASSWORD OS_AUTH_URL OS_TENANT_NAME).each do |var|
