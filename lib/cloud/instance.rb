@@ -100,7 +100,7 @@ module Cloud
     private
     def build_instance(index)
       image = get_image VM_IMAGE
-      flavor = @conn.get_flavor FLAVOR_1GB
+      flavor = @conn.get_flavor INSTANCE_FLAVOR
       name = "#{INSTANCE_PREFIX}#{index}"
       inst = @conn.create_server({
         :name => name,
