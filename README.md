@@ -63,3 +63,7 @@ Delete subnet s202926-subnet
 Delete network s202926-net
 
 ```
+
+### Note
+
+https://www.youtube.com/v/3funbluzm2A
