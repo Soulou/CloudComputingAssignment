@@ -1,9 +1,14 @@
 module Cloud
   NETWORK_NAME = "s202926-net"
   SUBNET_NAME  = "s202926-subnet"
-  SUBNET_RANGE = "192.168.111.111/24"
+  SUBNET_RANGE = "192.168.111.0/24"
   DNS_NAMESERVER = "10.7.0.3"
-
+  ROUTER_NAME = "s202926-router"
+  PUB_KEY_FILE="#{ENV["HOME"]}/.ssh/id_rsa.pub"
+  KEYPAIR_NAME = "s202926-key"
+  INSTANCE_PREFIX = "s202926vm-"
+  FLAVOR_1GB = 2
+  VM_IMAGE = "ubuntu-precise"
 
   class EnvError < RuntimeError
   end
@@ -16,11 +21,33 @@ module Cloud
    
       check_openstack_env
       @quantum = setup_connection "network"
-      @network = create_network
-      @subnetwork = create_subnetwork
+      @network = Network.get @quantum
+      @subnetwork = SubNetwork.get @quantum, @network
+      @tenant_id = @network.tenant_id
+      @router = Router.get @quantum, @subnetwork.id
+
+      @compute = setup_connection "compute"
+      KeyPair.import @compute
+      SecRule.new @compute, "-1"
+      SecRule.new @compute, "22"
+      @floating_ip = FloatingIp.get @compute
+
+      @gateway_instance = Instance.new(
+        @compute, {
+          :quantum => @quantum,
+          :type => "gateway", 
+          :ip => @floating_ip
+        }
+      )
+      (1...nb_instances).each do
+        Instance.new @compute
+      end
+      
+      puts "Cluster is booting, public ip is #{@floating_ip.ip}"
     end
     
     def check_openstack_env
+      puts "Validation of the Openstack environment variables"
       %w(OS_USERNAME OS_PASSWORD OS_AUTH_URL OS_TENANT_NAME).each do |var|
         if ENV[var].nil?
           raise EnvError.new "ENV[#{var}] is undefined"
@@ -39,26 +66,10 @@ module Cloud
         :service_type=> type
       })
       c.connection.service_path = "/"
+      if type == "compute"
+        c.connection.service_path = "/v2/#{@tenant_id}"
+      end
       return c
-    end
-    
-    def create_network
-      @quantum.networks.each do |n|
-        return n if n.name == NETWORK_NAME
-      end
-      return @quantum.create_network NETWORK_NAME
-    end
-    
-    def create_subnetwork
-      @network.subnets.each do |s|
-        subnet = @quantum.subnet s
-        return subnet if subnet.name == SUBNET_NAME
-      end
-      return @quantum.create_subnet(
-        @network.id,
-        SUBNET_RANGE, 4,
-        :name => SUBNET_NAME, :dns_nameservers => [DNS_NAMESERVER]
-      )
     end
   end
 end

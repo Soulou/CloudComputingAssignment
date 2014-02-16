@@ -16,11 +16,18 @@ def usage
 end
 
 
-if ARGV.length != 1 || !is_integer?(ARGV[0])
-  usage
+if ARGV.length != 1
+  if !is_integer?(ARGV[0])
+    usage
+  else
+  end
 end
 
 nb_nodes = ARGV[0].to_i
+if nb_nodes <= 0
+  puts "nb_nodes > 0"
+  usage
+end
 
 begin
   Cloud::Builder.new(nb_nodes)
