@@ -2,10 +2,13 @@ module Cloud
   class Instance
     $last_id = 0
 
+    attr_reader :ip
+
     def initialize(conn, opts = {})
       @conn = conn
       if opts.has_key? :instance
         @instance = opts[:instance]
+        @ip = @instance.addresses.last.address
       else
         $last_id += 1
         @instance = build_instance $last_id
@@ -20,13 +23,18 @@ module Cloud
       @instance.send args[0]
     end
 
-    def self.wait_all_boot(conn, instances)
+    def self.names(instances)
+      "[#{instances.map(&:name).join(", ")}]"
+    end
+
+    def self.wait_all_active(conn, instances)
       # We destroy the array so a copy before is required
       instances = instances.clone
+      seconds = 0
       vm_deleted = true
       while true
         if vm_deleted
-          puts "\nWait for [#{instances.map(&:name).join(", ")}] boot"
+          puts "\nWait for #{names(instances)} to be ACTIVE"
           vm_deleted = false
         end
 
@@ -39,22 +47,26 @@ module Cloud
           end
         end
         if instances.length == 0
-          puts "\nAll VMs have successfuly boot"
+          puts "\nAll VMs are ACTIVE"
           break
         else
+          if seconds > MAX_WAIT_TIME
+            raise "Timeout for boot #{names(instances)}"
+          end
           print "."
+          seconds += 1
           sleep 1
         end
       end
     end
-
     def self.wait_all_death(conn, instances)
       # We destroy the array so a copy before is required
+      seconds = 0
       instances = instances.clone
       vm_deleted = true
       while true
         if vm_deleted
-          puts "\nWait for [#{instances.map(&:name).join(", ")}] shutdown"
+          puts "\nWait for #{names(instances)} shutdown"
           vm_deleted = false
         end
 
@@ -70,7 +82,11 @@ module Cloud
           puts "\nAll VMs have been deleted"
           break
         else
+          if seconds > MAX_WAIT_TIME
+            raise "Timeout for shutdown #{names(instances)}"
+          end
           print "."
+          seconds += 1
           sleep 1
         end
       end
@@ -95,6 +111,7 @@ module Cloud
       # Not in the ruby-openstack gem
       data = JSON.generate({:floatingip => {:port_id => @port.id}})
       quantum.connection.req("PUT", "/floatingips/#{ip.id}", :data => data)
+      @ip = ip.ip
     end
 
     private

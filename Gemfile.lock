@@ -4,6 +4,7 @@ GEM
     coderay (1.1.0)
     json (1.8.1)
     method_source (0.8.2)
+    net-ssh (2.8.0)
     openstack (1.1.2)
       json
     pry (0.9.12.6)
@@ -16,5 +17,6 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  net-ssh
   openstack
   pry

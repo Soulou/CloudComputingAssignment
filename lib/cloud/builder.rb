@@ -7,9 +7,9 @@ module Cloud
   PUB_KEY_FILE= ENV["PUB_KEY_FILE"] || "#{ENV["HOME"]}/.ssh/id_rsa.pub"
   KEYPAIR_NAME = ENV["KEYPAIR_NAME"] || "s202926-key"
   INSTANCE_PREFIX = ENV["INSTANCE_PREFIX"] || "s202926vm-"
-  INSTANCE_FLAVOR = ENV["INSTANCE_FLAVOR"] || 2
+  INSTANCE_FLAVOR = ENV["INSTANCE_FLAVOR"] || "2"
   VM_IMAGE = ENV["VM_IMAGE"] || "ubuntu-precise"
-  MAX_WAIT_TIME = ENV["MAX_WAIT_TIME"] || 60
+  timeout = ENV["MAX_WAIT_TIME"] || 180 ; MAX_WAIT_TIME = timeout.to_i
 
   class EnvError < RuntimeError
   end
@@ -17,7 +17,6 @@ module Cloud
   class Builder
     def initialize
       @router = nil
-      @instances = []
    
       check_openstack_env
       @quantum = setup_connection "network"
@@ -28,25 +27,27 @@ module Cloud
       @router = Router.new @quantum, @subnetwork
 
       @compute = setup_connection "compute"
+      @instances = Instance.all @compute
     end
 
     def build(nb_instances)
       KeyPair.import @compute
       SecRule.new @compute, "-1"
       SecRule.new @compute, "22"
-      @floating_ip = FloatingIp.get @compute
       @instances = []
       (0...nb_instances).each do
         @instances << Instance.new(@compute)
       end
-      Instance.wait_all_boot(@compute, @instances)
-      @instances[0].set_floating_ip(@quantum, @floating_ip)
+      Instance.wait_all_active(@compute, @instances)
+      @instances.each do |i|
+        i.set_floating_ip(@quantum, FloatingIp.get(@compute))
+      end
+      Instance.wait_all_ssh(@compute, @instances)
       
-      puts "Cluster is booting, public ip is #{@floating_ip.ip}"
+      puts "VMs successfully created, cluster is booting"
     end
     
     def purge
-      @instances = Instance.all @compute
       if @instances == nil or @instances.length == 0
         puts "No VM to destroy"
       end
@@ -55,6 +56,26 @@ module Cloud
       @router.delete
       @subnetwork.delete
       @network.delete
+    end
+
+    def write_hostsfile(path, opts = {})
+      if opts[:type] == "ansible"
+        puts "Write Ansible hosts file: #{path}"
+        File.open path, "w" do |f|
+          @instances.each do |i|
+            f.puts "#{i.name} ansible_ssh_host=#{i.ip} ansible_ssh_user=ubuntu"
+          end   
+        end
+      elsif opts[:type] == "mpi"
+        puts "Write MPI machinefile file: #{path}"
+        File.open path, "w" do |f|
+          @instances.each do |i|
+            f.puts "ubuntu@#{i.ip}"
+          end   
+        end
+      else
+        raise "To type specified"
+      end
     end
 
     private 

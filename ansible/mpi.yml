@@ -1,0 +1,34 @@
+    - hosts: all
+      tasks: 
+        - name: Update list of packages
+          action: apt update_cache=true
+
+        - name: Install all the packages for MPI
+          action: apt pkg={{ item}} state=latest
+          with_items:
+            - libnss-myhostname
+            - gcc
+            - make
+            - mpich2
+            - openmpi-bin
+
+        - name: Install all the packages for MPI
+          action: user name=mpiuser
+        
+        - name: Create SSH Directory
+          action: file path=/home/mpiuser/.ssh state=directory owner=mpiuser group=mpiuser mode=750
+
+        - name: Copy Ubuntu SSH key
+          action: command cp /home/ubuntu/.ssh/authorized_keys /home/mpiuser/.ssh
+
+        - name: Change the right on authorized_keys
+          action: command chown mpiuser:mpiuser /home/mpiuser/.ssh/authorized_keys
+
+        - name: Copy private SSH key
+          action: copy src=files/id_rsa dest=/home/mpiuser/.ssh/id_rsa owner=mpiuser group=mpiuser mode=0700
+
+        - name: Copy public SSH key
+          action: copy src=files/id_rsa.pub dest=/home/mpiuser/.ssh/id_rsa.pub owner=mpiuser group=mpiuser mode=0700
+
+        - name: Add public key to SSH hosts
+          action: command echo 'cat /home/mpiuser/.ssh/id_rsa.pub >> /home/mpiuser/.ssh/authorized_keys' | bash
