@@ -51,6 +51,10 @@ module Cloud
 
     private
     def build_instance(index)
+      if $last_id == 10
+        puts "Wait 1 minute to avoid OverLimit error"
+        sleep 60
+      end
       image = get_image VM_IMAGE
       flavor = @conn.get_flavor INSTANCE_FLAVOR
       name = "#{INSTANCE_PREFIX}#{index}"
