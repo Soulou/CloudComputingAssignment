@@ -1,0 +1,8 @@
+ansible/hosts
+mpi/execution.log
+mpi/hosts
+mpi/matrices/
+mpi/results_flavor_1/
+mpi/results_flavor_2/
+mpi/results_flavor_3/
+
