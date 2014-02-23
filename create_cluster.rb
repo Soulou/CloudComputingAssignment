@@ -31,6 +31,8 @@ def create_cloud
     puts "Backtrace:\n#{e.backtrace.join("\n")}"
     exit 1
   end
+  puts "Waiting for the VMs to finalize their boot"
+  sleep 30
   mpi_cloud(b)
   ansible_cloud(b)
 end
