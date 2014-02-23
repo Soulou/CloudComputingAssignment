@@ -8,7 +8,9 @@ module Cloud
       @conn = conn
       if opts.has_key? :instance
         @instance = opts[:instance]
-        @ip = @instance.addresses.last.address
+        if @instance.addresses.length > 0
+	  @ip = @instance.addresses.last.address
+        end
       else
         $last_id += 1
         @instance = build_instance $last_id
