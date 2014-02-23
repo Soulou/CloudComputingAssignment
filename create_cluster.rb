@@ -53,7 +53,7 @@ def ansible_cloud(b = Cloud::Builder.new)
   FileUtils.mkdir_p ansible_dir
   b.write_hostsfile File.join(ansible_dir, "hosts"), :type => "ansible"
   FileUtils.cd ansible_dir
-  system "ansible-playbook -c paramiko -i hosts mpi.yml --sudo"
+  system "ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -c paramiko -i hosts mpi.yml --sudo"
 end
 
 def mpi_cloud(b = Cloud::Builder.new)
