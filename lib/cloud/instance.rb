@@ -53,7 +53,7 @@ module Cloud
 
     private
     def build_instance(index)
-      if $last_id == 10
+      if $last_id % 10 == 0
         puts "Wait 1 minute to avoid OverLimit error"
         sleep 60
       end
