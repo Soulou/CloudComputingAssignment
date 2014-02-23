@@ -16,6 +16,8 @@ module Cloud
             if i.status == "ACTIVE"
               instances.delete(i)
               vm_deleted = true
+            elsif i.status == "ERROR"
+              raise "ERROR status for #{i.name}"
             else
               i.refresh
             end
