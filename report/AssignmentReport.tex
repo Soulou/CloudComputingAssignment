@@ -5,6 +5,13 @@
 \usepackage{hyperref}
 \usepackage{caption}
 \usepackage{graphicx}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=gray,
+  urlcolor=blue
+}
 
 \title{Cloud Computing Assignment: MPI on the cloud}
 \author{Léo Unbekandt}
@@ -17,12 +24,14 @@
 \section{Settings}
 \subsection{Parameters}
 
-The experiments have been done with the following values:
+Different sizes of matrix have been chosen in order to study the scalability of
+MPI on a cloud based cluster. (128, 256, 512, 1024, 1360). The deployed cluster has been
+composed of 1, 2, 4, 8 or 16 nodes. These values are really convenient as they are
+all powers of two, so the computation domain can be equally divided among the
+different virtual machines. The size of cluster is however limited by the quota
+in vCPUs (32) or Memory (50GB) and finally the different flavors of virtual machines
+which have been used:
 
-Size of the square matrix: 128, 256, 512, 1024.
-Number of nodes: 1, 2, 4, 8, 16 (except with 2 and 3 vCPUS VMs). This number
-is limited by the quota in vCPUs (32) or Memory (50GB) and finally the
-different flavors of virtual machines which have been used:
 \begin{itemize}
   \item 1 - m1.tiny (512MB RAM, 1vCPU)
   \item 2 - m1.small (2GB RAM, 1vCPU)
@@ -34,7 +43,7 @@ When a virtual machine has more than 1 vCPU, the MPI flag -npernode is used, in 
 to execute one instance of the application per vCPU, otherwise. Otherwise, it is
 useless to choose high quality flavors.
 
-\subsection{Automation of the exectution}
+\subsection{Automation of the execution}
 
 These tests have been run using only one command to avoid a maximum of human
 interactions. A ruby script has been developed to create the nodes cluster and to
@@ -42,9 +51,9 @@ destroy it. When the cluster has been built, it automatically runs ansible in
 order to configure the nodes and install Open MPI on them.
 
 Once the platform is ready, another script is able to run the experiments with
-the different kinds of matrix et get the output result back. (run\_matrix\_multiply.sh)
+the different kinds of matrix et get the output result back. (\texttt{run\_matrix\_multiply.sh})
 
-Finally a last script (run\_experiment.sh) takes care to:
+Finally a last script (\texttt{run\_experiment.sh}) takes care to:
 \begin{enumerate}
   \item Build a cluster with N nodes and flavor F
   \item Run MPI experiments
@@ -54,11 +63,12 @@ Finally a last script (run\_experiment.sh) takes care to:
 \end{enumerate}
 
 This last program takes care of everything, nothing else has to be done, except
-reading and interpreting the results!
+reading and interpreting the results! Please read the \texttt{README.md}
 
 \section{Results}
 
-The results in this section come from VMs of flavor 1, which have only one CPU.
+The results in this section come from VMs of flavor 1 because I've been able to execute 16-nodes
+computation. They have only one CPU and 512MB of RAM.
 
 \subsection{Small matrices computation}
 
@@ -114,11 +124,18 @@ The price for a single instance with one CPU on Amazon EC2 depends of the flavor
  \item m1.large \$0.520 per hour
 \end{itemize}
 
-For small-scale experiments like this one, the price would be completely
+For small-scale experiments like these ones, the price would be completely
 negligible, however for MPI operations, the lesser the communications, the
 faster the execution. As a result, it is more interesting to take high-CPUs
 instances. For instance, in the case of intensive computational MPI tasks, one 
-m1.large is more interesting than four m1.tiny. The price per CPU is identical.
+m1.large is more interesting than four m1.t iny. The price per CPU is identical.
+
+\section*{Technical difficulties}
+
+Only one limitation linked to the OpenStack cluster has been encountered. With
+the current quota it should have been possible to deploy a 32 nodes cluster.
+However when booting 32 VMs, only 24 were working correctly, the last 8 got the
+status "\texttt{ERROR}". \hyperref[figure:errors]{Screenshot}
 
 \section*{Conclusion}
 
@@ -126,8 +143,6 @@ To conclude. we can see that MPI on the cloud is working well, however the
 communication overhead is more important than on a supercomputer and it's
 important to be aware of it. Furthermore the performance may be unstable, the
 instances may share their CPUs with other resource-consuming instances.
-
-
 
 \section*{Appendices}
 \appendix 
@@ -182,5 +197,10 @@ instances may share their CPUs with other resource-consuming instances.
 \captionof{table}{Computation time according to the number of nodes to the size of the matrix for VMs flavor 4}
 \vspace{1em}
 \end{center}
+
+\section{Errors screenshot}
+\label{figure:errors}
+
+\includegraphics[width=\textwidth]{./errors.png}
 
 \end{document}
